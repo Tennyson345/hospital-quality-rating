@@ -66,6 +66,7 @@ const HospitalRatingDemoComponent = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasRated, setHasRated] = useState(false);
+  const [showResults, setShowResults] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
