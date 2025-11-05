@@ -98,7 +98,7 @@ contract HospitalQualityRating is SepoliaConfig {
         bytes calldata environmentProof,
         externalEuint32 guidance,
         bytes calldata guidanceProof
-    ) external {
+    ) external onlyNewUser {
 
         // Convert external encrypted values to internal euint32
         // Verify identity proof (result not used, just verification)

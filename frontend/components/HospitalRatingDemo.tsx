@@ -371,7 +371,11 @@ const HospitalRatingDemoComponent = () => {
       const errorObj = error instanceof Error ? error : { message: "Unknown error" };
       let errorMessage = errorObj.message || "Unknown error";
       
-      // BUG: Removed error pattern checking - duplicate submissions will not be handled properly
+      // Check for common error patterns
+      if (errorMessage.includes("already submitted") || errorMessage.includes("hasRated")) {
+        errorMessage = "You have already submitted a rating. Each user can only submit once.";
+        setHasRated(true);
+      } else if (errorMessage.includes("execution reverted")) {
         // Try to decode custom error - check if user has already rated
         // The error data might contain information about the revert reason
         try {
