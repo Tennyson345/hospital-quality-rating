@@ -60,6 +60,10 @@ contract HospitalQualityRating is SepoliaConfig {
     event RatingSubmitted(address indexed user, uint64 timestamp);
     event StatisticsUpdated(uint64 timestamp);
 
+    // Events
+    event RatingSubmitted(address indexed user, uint64 timestamp);
+    event StatisticsUpdated(uint64 timestamp);
+
     constructor() {
         // Allow contract to operate on initial statistics values (owned by deployer)
         FHE.allow(totalRatings, address(this));
