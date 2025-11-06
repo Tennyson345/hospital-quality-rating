@@ -162,6 +162,44 @@ describe("HospitalQualityRatingSepolia", function () {
     expect(clearSumTotal).to.be.gte(45);
   });
 
+  it("Should handle encrypted statistics correctly", async function () {
+    progress("Testing encrypted statistics retrieval");
+
+    // Submit a rating first
+    const encryptedIdentity = await fhevm.encrypt64(BigInt(ethers.encodeBytes32String("stats-test-user")));
+    const encryptedService = await fhevm.encrypt64(BigInt(8));
+    const encryptedMedicine = await fhevm.encrypt64(BigInt(9));
+    const encryptedDoctor = await fhevm.encrypt64(BigInt(7));
+    const encryptedFacility = await fhevm.encrypt64(BigInt(8));
+    const encryptedEnvironment = await fhevm.encrypt64(BigInt(6));
+    const encryptedGuidance = await fhevm.encrypt64(BigInt(9));
+
+    const tx = await contract.connect(signers.alice).submitRating(
+      encryptedIdentity.handles[0],
+      encryptedIdentity.inputProof,
+      encryptedService.handles[0],
+      encryptedService.inputProof,
+      encryptedMedicine.handles[0],
+      encryptedMedicine.inputProof,
+      encryptedDoctor.handles[0],
+      encryptedDoctor.inputProof,
+      encryptedFacility.handles[0],
+      encryptedFacility.inputProof,
+      encryptedEnvironment.handles[0],
+      encryptedEnvironment.inputProof,
+      encryptedGuidance.handles[0],
+      encryptedGuidance.inputProof
+    );
+    await tx.wait();
+
+    // Test encrypted statistics retrieval
+    const encryptedStats = await contract.getBatchStatistics();
+    expect(encryptedStats.total).to.not.be.undefined;
+    expect(encryptedStats.avgService).to.not.be.undefined;
+
+    progress("Successfully tested encrypted statistics retrieval");
+  });
+
   it("Should prevent duplicate ratings from same user", async function () {
     progress("Testing duplicate rating prevention");
 
