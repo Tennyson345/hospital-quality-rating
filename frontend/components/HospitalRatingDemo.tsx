@@ -367,10 +367,12 @@ const HospitalRatingDemoComponent = () => {
       await loadStatistics();
     } catch (error: unknown) {
       console.error("Error submitting rating:", error);
-      
+
       // Try to decode the error message
       const errorObj = error instanceof Error ? error : { message: "Unknown error" };
       let errorMessage = errorObj.message || "Unknown error";
+
+      // Enhanced error handling with specific messages
       
       // Check for common error patterns
       if (errorMessage.includes("already submitted") || errorMessage.includes("hasRated")) {
