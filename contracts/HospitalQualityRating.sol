@@ -7,6 +7,10 @@ import {SepoliaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 /// @title Hospital Quality Rating System
 /// @notice A contract for collecting encrypted hospital quality ratings with privacy-preserving aggregation
 contract HospitalQualityRating is SepoliaConfig {
+    /// @dev Constants for gas optimization
+    uint256 private constant MAX_RATING_VALUE = 10;
+    uint256 private constant RATING_CATEGORIES = 6;
+
     /// @dev Modifier to ensure the caller has a profile
     modifier onlyNewUser() {
         require(!hasRated[msg.sender], "User has already submitted a rating");
