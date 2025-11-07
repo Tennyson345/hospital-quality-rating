@@ -264,6 +264,12 @@ contract HospitalQualityRating is SepoliaConfig {
         return hasRated[user];
     }
 
+    /// @notice Get total number of ratings submitted
+    /// @return count Total number of ratings
+    function getTotalRatingsCount() external view returns (euint32) {
+        return totalRatings;
+    }
+
     /// @notice Get batch statistics for efficient frontend queries
     /// @return total Total number of ratings
     /// @return avgService Average service quality
