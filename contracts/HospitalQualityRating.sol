@@ -7,6 +7,9 @@ import {SepoliaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 /// @title Hospital Quality Rating System
 /// @notice A contract for collecting encrypted hospital quality ratings with privacy-preserving aggregation
 contract HospitalQualityRating is SepoliaConfig {
+    /// @dev Emergency stop flag
+    bool private _emergencyStopped;
+
     /// @dev Constants for gas optimization
     uint256 private constant MAX_RATING_VALUE = 10;
     uint256 private constant RATING_CATEGORIES = 6;
@@ -14,6 +17,12 @@ contract HospitalQualityRating is SepoliaConfig {
     /// @dev Modifier to ensure the caller has a profile
     modifier onlyNewUser() {
         require(!hasRated[msg.sender], "User has already submitted a rating");
+        _;
+    }
+
+    /// @dev Modifier to check if contract is not in emergency stop
+    modifier whenNotEmergencyStopped() {
+        require(!_emergencyStopped, "Contract is emergency stopped");
         _;
     }
     /// @dev Constants for gas optimization
@@ -106,7 +115,7 @@ contract HospitalQualityRating is SepoliaConfig {
         bytes calldata environmentProof,
         externalEuint32 guidance,
         bytes calldata guidanceProof
-    ) external onlyNewUser {
+    ) external onlyNewUser whenNotEmergencyStopped {
 
         // Convert external encrypted values to internal euint32
         // Verify identity proof (result not used, just verification)
