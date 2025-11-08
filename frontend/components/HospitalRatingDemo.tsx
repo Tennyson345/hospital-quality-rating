@@ -76,6 +76,7 @@ const HospitalRatingDemoComponent = () => {
   }, []);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent, action: () => void) => {
     if (event.key === 'Enter' || event.key === ' ') {
