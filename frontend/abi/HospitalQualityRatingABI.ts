@@ -11,6 +11,126 @@ export const HospitalQualityRatingABI = {
       "type": "constructor"
     },
     {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "caller",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "timestamp",
+          "type": "uint64"
+        }
+      ],
+      "name": "ContractEmergencyStop",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "caller",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "timestamp",
+          "type": "uint64"
+        }
+      ],
+      "name": "ContractResumed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "timestamp",
+          "type": "uint64"
+        }
+      ],
+      "name": "RatingSubmitted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "timestamp",
+          "type": "uint64"
+        }
+      ],
+      "name": "StatisticsUpdated",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "emergencyStop",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getBatchStatistics",
+      "outputs": [
+        {
+          "internalType": "euint32",
+          "name": "total",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "avgService",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "avgMedicine",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "avgDoctor",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "avgFacility",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "avgEnvironment",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "avgGuidance",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "getStatistics",
       "outputs": [
@@ -163,6 +283,19 @@ export const HospitalQualityRatingABI = {
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "getTotalRatingsCount",
+      "outputs": [
+        {
+          "internalType": "euint32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -192,6 +325,13 @@ export const HospitalQualityRatingABI = {
         }
       ],
       "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "resumeContract",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {

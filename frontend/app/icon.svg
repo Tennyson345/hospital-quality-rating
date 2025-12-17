@@ -1,0 +1,15 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="medicalGradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <!-- Green rounded square background with gradient matching the page design -->
+  <rect width="32" height="32" rx="6" fill="url(#medicalGradient)"/>
+  <!-- White medical cross (horizontal line) -->
+  <rect x="10" y="15" width="12" height="2" rx="1" fill="white"/>
+  <!-- White medical cross (vertical line) -->
+  <rect x="15" y="10" width="2" height="12" rx="1" fill="white"/>
+</svg>
+
