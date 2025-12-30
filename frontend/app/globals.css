@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ensure body and html are positioned correctly */
+html, body {
+  position: relative;
+  min-height: 100vh;
+}
+
 /* Medical Green Theme Colors */
 :root {
   --medical-green: #00d4aa;
@@ -20,15 +26,37 @@
   --medical-green-950: #042f2e;
 }
 
-/* Medical background with subtle pattern */
+/* Medical background with hospital image */
 .medical-bg {
-  background: linear-gradient(135deg, var(--medical-green-50) 0%, var(--medical-green-100) 100%);
-  background-image:
-    url('/hospital-pattern.svg'),
-    radial-gradient(circle at 25% 25%, rgba(0, 212, 170, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 75% 75%, rgba(0, 212, 170, 0.03) 0%, transparent 50%);
-  background-size: 100px 100px, auto, auto;
-  background-repeat: repeat, no-repeat, no-repeat;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('/hospital.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Overlay to maintain readability and medical green theme */
+.medical-bg::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(240, 253, 250, 0.75) 0%,
+    rgba(204, 251, 241, 0.70) 50%,
+    rgba(153, 246, 228, 0.75) 100%
+  );
+  pointer-events: none;
 }
 
 /* Medical card styling */

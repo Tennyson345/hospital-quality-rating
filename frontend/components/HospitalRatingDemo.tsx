@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useFhevm } from "@/fhevm/useFhevm";
@@ -66,17 +66,6 @@ const HospitalRatingDemoComponent = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasRated, setHasRated] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-
-  const handleKeyDown = useCallback((event: React.KeyboardEvent, action: () => void) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      action();
-    }
-  }, []);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
   const [statistics, setStatistics] = useState<{
     totalRatings: number;
     averages: {
@@ -92,6 +81,22 @@ const HospitalRatingDemoComponent = () => {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [message, setMessage] = useState("");
   const [activeTab, setActiveTab] = useState<'rate' | 'stats'>('rate');
+  
+  // Hospital management state
+  const [selectedHospitalId, setSelectedHospitalId] = useState<number | null>(null);
+  const [hospitals, setHospitals] = useState<Array<{
+    id: number;
+    name: string;
+    location: string;
+    createdAt: number;
+    isActive: boolean;
+  }>>([]);
+  const [isDeployer, setIsDeployer] = useState(false);
+  const [showCreateHospital, setShowCreateHospital] = useState(false);
+  const [newHospitalName, setNewHospitalName] = useState("");
+  const [newHospitalLocation, setNewHospitalLocation] = useState("");
+  const [isCreatingHospital, setIsCreatingHospital] = useState(false);
+  const [selectedHospitalForStats, setSelectedHospitalForStats] = useState<number | null>(null);
 
   // Ensure component is mounted on client side
   useEffect(() => {
@@ -117,17 +122,102 @@ const HospitalRatingDemoComponent = () => {
     enabled: isConnected && isDeployed,
   });
 
-  // Check if user has already rated
+  // Check if user is deployer
   useEffect(() => {
-    if (!isConnected || !isDeployed || !address || !publicClient) return;
+    if (!isConnected || !isDeployed || !address || !publicClient || !contractAddress) {
+      console.log("Deployer check skipped:", { isConnected, isDeployed, address, publicClient: !!publicClient, contractAddress });
+      return;
+    }
+
+    const checkDeployer = async () => {
+      try {
+        console.log("Checking deployer...", { contractAddress, address });
+        const deployerAddress = await publicClient.readContract({
+          address: contractAddress as `0x${string}`,
+          abi: HospitalQualityRatingABI.abi,
+          functionName: "deployer",
+        });
+        
+        const isDeployerMatch = deployerAddress.toLowerCase() === address.toLowerCase();
+        console.log("Deployer check result:", {
+          deployerAddress,
+          currentAddress: address,
+          isDeployer: isDeployerMatch
+        });
+        
+        setIsDeployer(isDeployerMatch);
+      } catch (error) {
+        console.error("Error checking deployer:", error);
+        setIsDeployer(false);
+      }
+    };
+
+    checkDeployer();
+  }, [isConnected, isDeployed, address, publicClient, contractAddress]);
+
+  // Load hospitals list
+  const loadHospitals = useCallback(async () => {
+    if (!isConnected || !isDeployed || !contractAddress || !publicClient) return;
+
+    try {
+      // Use getAllHospitalIds to get all hospital IDs efficiently
+      const hospitalIds = await publicClient.readContract({
+        address: contractAddress as `0x${string}`,
+        abi: HospitalQualityRatingABI.abi,
+        functionName: "getAllHospitalIds",
+      }) as bigint[];
+
+      const hospitalList = [];
+      for (const hospitalId of hospitalIds) {
+        try {
+          const hospital = await publicClient.readContract({
+            address: contractAddress as `0x${string}`,
+            abi: HospitalQualityRatingABI.abi,
+            functionName: "getHospital",
+            args: [hospitalId],
+          }) as [string, string, bigint, boolean];
+
+          hospitalList.push({
+            id: Number(hospitalId),
+            name: hospital[0],
+            location: hospital[1],
+            createdAt: Number(hospital[2]),
+            isActive: hospital[3],
+          });
+        } catch (error) {
+          console.error(`Error loading hospital ${hospitalId}:`, error);
+        }
+      }
+
+      setHospitals(hospitalList);
+      
+      // Auto-select first active hospital if none selected
+      if (!selectedHospitalId && hospitalList.length > 0) {
+        const firstActive = hospitalList.find(h => h.isActive);
+        if (firstActive) {
+          setSelectedHospitalId(firstActive.id);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading hospitals:", error);
+    }
+  }, [isConnected, isDeployed, contractAddress, publicClient, selectedHospitalId]);
+
+  useEffect(() => {
+    loadHospitals();
+  }, [loadHospitals]);
+
+  // Check if user has already rated the selected hospital
+  useEffect(() => {
+    if (!isConnected || !isDeployed || !address || !publicClient || !selectedHospitalId) return;
 
     const checkHasRated = async () => {
       try {
         const result = await publicClient.readContract({
           address: contractAddress as `0x${string}`,
           abi: HospitalQualityRatingABI.abi,
-          functionName: "hasUserRated",
-          args: [address as `0x${string}`],
+          functionName: "hasUserRatedHospital",
+          args: [address as `0x${string}`, BigInt(selectedHospitalId)],
         });
         setHasRated(result as boolean);
       } catch (error) {
@@ -136,9 +226,135 @@ const HospitalRatingDemoComponent = () => {
     };
 
     checkHasRated();
-  }, [isConnected, isDeployed, address, publicClient, contractAddress]);
+  }, [isConnected, isDeployed, address, publicClient, contractAddress, selectedHospitalId]);
 
-  // Load statistics
+  // Load statistics for a specific hospital
+  const loadHospitalStatistics = async (hospitalId: number) => {
+    if (!isConnected || !isDeployed || !fhevmInstance || !contractAddress) {
+      setMessage("Please connect your wallet and ensure contract is deployed");
+      return;
+    }
+
+    setIsLoadingStats(true);
+    setMessage(`Loading statistics for hospital ${hospitalId}...`);
+
+    try {
+      let contractProvider: ethers.Provider;
+      if (chainId === 31337) {
+        contractProvider = new ethers.JsonRpcProvider("http://localhost:8545");
+      } else if (publicClient) {
+        const network = {
+          chainId: publicClient.chain.id,
+          name: publicClient.chain.name,
+          ensAddress: publicClient.chain.contracts?.ensRegistry?.address,
+        };
+        contractProvider = new ethers.BrowserProvider(publicClient.transport, network);
+      } else {
+        throw new Error("No provider available");
+      }
+      
+      const contract = new ethers.Contract(
+        contractAddress,
+        HospitalQualityRatingABI.abi,
+        contractProvider
+      );
+
+      // Get hospital-specific statistics
+      const hospitalStats = await contract.getHospitalStatistics(hospitalId);
+      
+      const handles = [
+        hospitalStats.count,
+        hospitalStats.sumService,
+        hospitalStats.sumMedicine,
+        hospitalStats.sumDoctor,
+        hospitalStats.sumFacility,
+        hospitalStats.sumEnvironment,
+        hospitalStats.sumGuidance,
+        hospitalStats.sumTotal,
+      ].filter(h => h && h !== "0x0000000000000000000000000000000000000000000000000000000000000000");
+
+      if (handles.length === 0) {
+        setStatistics({
+          totalRatings: 0,
+          averages: {
+            service: 0,
+            medicine: 0,
+            doctor: 0,
+            facility: 0,
+            environment: 0,
+            guidance: 0,
+          },
+          totalScore: 0,
+        });
+        setMessage("No statistics available for this hospital yet");
+        setIsLoadingStats(false);
+        return;
+      }
+
+      let results;
+      try {
+        results = await fhevmInstance.publicDecrypt(handles);
+      } catch (decryptError: unknown) {
+        // Handle case where statistics haven't been made publicly decryptable yet
+        // This happens when no ratings have been submitted yet
+        if (decryptError instanceof Error && 
+            (decryptError.message.includes("not allowed for public decryption") ||
+             decryptError.message.includes("is not allowed for public decryption"))) {
+          setStatistics({
+            totalRatings: 0,
+            averages: {
+              service: 0,
+              medicine: 0,
+              doctor: 0,
+              facility: 0,
+              environment: 0,
+              guidance: 0,
+            },
+            totalScore: 0,
+          });
+          setMessage("No statistics available for this hospital yet. Submit a rating first!");
+          setIsLoadingStats(false);
+          return;
+        }
+        // Re-throw other errors
+        throw decryptError;
+      }
+
+      const decryptedTotal = results[hospitalStats.count] || "0";
+      const decryptedService = results[hospitalStats.sumService] || "0";
+      const decryptedMedicine = results[hospitalStats.sumMedicine] || "0";
+      const decryptedDoctor = results[hospitalStats.sumDoctor] || "0";
+      const decryptedFacility = results[hospitalStats.sumFacility] || "0";
+      const decryptedEnvironment = results[hospitalStats.sumEnvironment] || "0";
+      const decryptedGuidance = results[hospitalStats.sumGuidance] || "0";
+      const decryptedTotalScore = results[hospitalStats.sumTotal] || "0";
+
+      const total = Number(decryptedTotal);
+      const stats = {
+        totalRatings: total,
+        averages: {
+          service: total > 0 ? Number(decryptedService) / total : 0,
+          medicine: total > 0 ? Number(decryptedMedicine) / total : 0,
+          doctor: total > 0 ? Number(decryptedDoctor) / total : 0,
+          facility: total > 0 ? Number(decryptedFacility) / total : 0,
+          environment: total > 0 ? Number(decryptedEnvironment) / total : 0,
+          guidance: total > 0 ? Number(decryptedGuidance) / total : 0,
+        },
+        totalScore: total > 0 ? Number(decryptedTotalScore) / total : 0,
+      };
+
+      setStatistics(stats);
+      setMessage("Statistics loaded successfully");
+    } catch (error: unknown) {
+      console.error("Error loading hospital statistics:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      setMessage(`Error: ${errorMessage}`);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  // Load statistics (global - for backward compatibility)
   const loadStatistics = async () => {
     if (!isConnected || !isDeployed || !fhevmInstance || !contractAddress) {
       setMessage("Please connect your wallet and ensure contract is deployed");
@@ -217,7 +433,34 @@ const HospitalRatingDemoComponent = () => {
 
       // Use publicDecrypt for publicly decryptable values (no signature needed)
       // This allows anyone to decrypt the aggregated statistics
-      const results = await fhevmInstance.publicDecrypt(handles);
+      let results;
+      try {
+        results = await fhevmInstance.publicDecrypt(handles);
+      } catch (decryptError: unknown) {
+        // Handle case where statistics haven't been made publicly decryptable yet
+        // This happens when no ratings have been submitted yet
+        if (decryptError instanceof Error && 
+            (decryptError.message.includes("not allowed for public decryption") ||
+             decryptError.message.includes("is not allowed for public decryption"))) {
+          setStatistics({
+            totalRatings: 0,
+            averages: {
+              service: 0,
+              medicine: 0,
+              doctor: 0,
+              facility: 0,
+              environment: 0,
+              guidance: 0,
+            },
+            totalScore: 0,
+          });
+          setMessage("No statistics available yet. Submit a rating first!");
+          setIsLoadingStats(false);
+          return;
+        }
+        // Re-throw other errors
+        throw decryptError;
+      }
 
       const decryptedTotal = results[encTotalRatings] || "0";
       const decryptedService = results[encSumService] || "0";
@@ -253,6 +496,59 @@ const HospitalRatingDemoComponent = () => {
     }
   };
 
+  // Create hospital (deployer only)
+  const handleCreateHospital = async () => {
+    if (!isDeployer || !walletClient || !contractAddress) {
+      setMessage("Only deployer can create hospitals");
+      return;
+    }
+
+    if (!newHospitalName.trim() || !newHospitalLocation.trim()) {
+      setMessage("Please fill in all fields");
+      return;
+    }
+
+    setIsCreatingHospital(true);
+    setMessage("Creating hospital...");
+
+    try {
+      const { account, chain, transport } = walletClient;
+      const network = {
+        chainId: chain.id,
+        name: chain.name,
+        ensAddress: chain.contracts?.ensRegistry?.address,
+      };
+      const provider = new ethers.BrowserProvider(transport, network);
+      const signer = await provider.getSigner(account.address);
+      const contract = new ethers.Contract(
+        contractAddress,
+        HospitalQualityRatingABI.abi,
+        signer
+      );
+
+      const tx = await contract.createHospital(
+        newHospitalName.trim(),
+        newHospitalLocation.trim()
+      );
+
+      setMessage(`Creating hospital... Transaction: ${tx.hash}`);
+      await tx.wait();
+      setMessage("Hospital created successfully!");
+
+      // Reset form and refresh list
+      setNewHospitalName("");
+      setNewHospitalLocation("");
+      setShowCreateHospital(false);
+      await loadHospitals();
+    } catch (error) {
+      console.error("Error creating hospital:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      setMessage(`Error: ${errorMessage}`);
+    } finally {
+      setIsCreatingHospital(false);
+    }
+  };
+
   // Submit rating
   const handleSubmit = async () => {
     if (!isConnected || !isDeployed || !fhevmInstance || !address || !contractAddress || !walletClient) {
@@ -260,9 +556,15 @@ const HospitalRatingDemoComponent = () => {
       return;
     }
 
-    // Check if user has already submitted
+    // Check if hospital is selected
+    if (!selectedHospitalId) {
+      setMessage("Please select a hospital");
+      return;
+    }
+
+    // Check if user has already submitted for this hospital
     if (hasRated) {
-      setMessage("You have already submitted a rating. Each user can only submit once.");
+      setMessage("You have already submitted a rating for this hospital. Each user can only submit once per hospital.");
       return;
     }
 
@@ -277,16 +579,16 @@ const HospitalRatingDemoComponent = () => {
     setMessage("Encrypting and submitting rating...");
 
     try {
-      // Double-check hasRated status before submitting (in case it changed)
-      if (publicClient && contractAddress && address) {
+      // Double-check hasRated status for this hospital before submitting
+      if (publicClient && contractAddress && address && selectedHospitalId) {
         const hasRatedCheck = await publicClient.readContract({
           address: contractAddress as `0x${string}`,
           abi: HospitalQualityRatingABI.abi,
-          functionName: "hasUserRated",
-          args: [address as `0x${string}`],
+          functionName: "hasUserRatedHospital",
+          args: [address as `0x${string}`, BigInt(selectedHospitalId)],
         });
         if (hasRatedCheck) {
-          setMessage("You have already submitted a rating. Each user can only submit once.");
+          setMessage("You have already submitted a rating for this hospital. Each user can only submit once per hospital.");
           setHasRated(true);
           return;
         }
@@ -343,8 +645,9 @@ const HospitalRatingDemoComponent = () => {
         .add32(ratings.guidance)
         .encrypt();
 
-      // Submit transaction
+      // Submit transaction with hospitalId
       const tx = await contract.submitRating(
+        selectedHospitalId!, // hospitalId as first parameter
         encryptedIdentity.handles[0],
         encryptedIdentity.inputProof,
         encryptedService.handles[0],
@@ -363,9 +666,21 @@ const HospitalRatingDemoComponent = () => {
 
       setMessage(`Transaction submitted: ${tx.hash}. Waiting for confirmation...`);
       await tx.wait();
-      setMessage("Rating submitted successfully!");
+      setMessage("Rating submitted successfully! You can now rate another hospital.");
       setHasRated(true);
-      await loadStatistics();
+      // Reset ratings for next submission
+      setRatings({
+        service: 0,
+        medicine: 0,
+        doctor: 0,
+        facility: 0,
+        environment: 0,
+        guidance: 0,
+      });
+      // Reload statistics for the selected hospital
+      if (selectedHospitalId) {
+        await loadHospitalStatistics(selectedHospitalId);
+      }
     } catch (error: unknown) {
       console.error("Error submitting rating:", error);
 
@@ -376,23 +691,24 @@ const HospitalRatingDemoComponent = () => {
       // Enhanced error handling with specific messages
       
       // Check for common error patterns
-      if (errorMessage.includes("already submitted") || errorMessage.includes("hasRated")) {
-        errorMessage = "You have already submitted a rating. Each user can only submit once.";
+      if (errorMessage.includes("already submitted") || errorMessage.includes("hasRated") || errorMessage.includes("already rated")) {
+        errorMessage = "You have already submitted a rating for this hospital. Each user can only submit once per hospital.";
         setHasRated(true);
+      } else if (errorMessage.includes("Invalid hospital ID") || errorMessage.includes("does not exist")) {
+        errorMessage = "Invalid hospital selected. Please select a valid hospital.";
       } else if (errorMessage.includes("execution reverted")) {
         // Try to decode custom error - check if user has already rated
-        // The error data might contain information about the revert reason
         try {
-          // Re-check hasRated status from contract
-          if (publicClient && contractAddress && address) {
+          // Re-check hasRated status for this hospital
+          if (publicClient && contractAddress && address && selectedHospitalId) {
             const hasRatedCheck = await publicClient.readContract({
               address: contractAddress as `0x${string}`,
               abi: HospitalQualityRatingABI.abi,
-              functionName: "hasUserRated",
-              args: [address as `0x${string}`],
+              functionName: "hasUserRatedHospital",
+              args: [address as `0x${string}`, BigInt(selectedHospitalId)],
             });
             if (hasRatedCheck) {
-              errorMessage = "You have already submitted a rating. Each user can only submit once.";
+              errorMessage = "You have already submitted a rating for this hospital. Each user can only submit once per hospital.";
               setHasRated(true);
             } else {
               errorMessage = `Transaction failed: ${errorMessage}. This might be due to an issue with the encrypted data validation. Please try again.`;
@@ -417,7 +733,7 @@ const HospitalRatingDemoComponent = () => {
   // Prevent hydration mismatch by showing loading state until mounted
   if (!mounted) {
     return (
-      <div className="min-h-screen medical-bg">
+      <div className="min-h-screen">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center">
@@ -437,7 +753,7 @@ const HospitalRatingDemoComponent = () => {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen medical-bg">
+      <div className="min-h-screen">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
         {/* Hero Section */}
@@ -504,7 +820,7 @@ const HospitalRatingDemoComponent = () => {
 
   if (!isDeployed) {
     return (
-      <div className="min-h-screen medical-bg">
+      <div className="min-h-screen">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="medical-card p-8 text-center max-w-md">
@@ -529,7 +845,7 @@ const HospitalRatingDemoComponent = () => {
   }
 
   return (
-    <div className="min-h-screen medical-bg">
+    <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header with Wallet Connection */}
         <div className="mb-8">
@@ -590,8 +906,7 @@ const HospitalRatingDemoComponent = () => {
       {/* Rating Tab */}
       {activeTab === 'rate' && (
         <div className="max-w-2xl mx-auto">
-          {!hasRated ? (
-            <div className="medical-card p-8">
+          <div className="medical-card p-8">
               <div className="text-center mb-8">
                 <div className="w-16 h-16 bg-medical-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-medical-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -602,6 +917,57 @@ const HospitalRatingDemoComponent = () => {
                 <p className="text-medical-green-600">
                   Rate your hospital experience across 6 key categories. All data is encrypted and anonymous.
                 </p>
+              </div>
+
+              {/* Hospital Selection */}
+              <div className="mb-6">
+                <label className="block font-semibold text-medical-green-800 text-lg mb-2">
+                  Select Hospital *
+                </label>
+                <select
+                  value={selectedHospitalId || ""}
+                  onChange={async (e) => {
+                    const id = Number(e.target.value);
+                    setSelectedHospitalId(id);
+                    setHasRated(false); // Reset hasRated when hospital changes
+                    // Check if user has already rated this hospital
+                    if (id && isConnected && isDeployed && address && publicClient && contractAddress) {
+                      try {
+                        const result = await publicClient.readContract({
+                          address: contractAddress as `0x${string}`,
+                          abi: HospitalQualityRatingABI.abi,
+                          functionName: "hasUserRatedHospital",
+                          args: [address as `0x${string}`, BigInt(id)],
+                        });
+                        if (result) {
+                          setHasRated(true);
+                          setMessage("You have already submitted a rating for this hospital. Please select another hospital to rate.");
+                        } else {
+                          setMessage("");
+                        }
+                      } catch (error) {
+                        console.error("Error checking if user has rated:", error);
+                      }
+                    }
+                  }}
+                  className="w-full px-4 py-3 border border-medical-green-300 rounded-lg focus:ring-2 focus:ring-medical-green-500 focus:border-transparent bg-white text-medical-green-900"
+                  disabled={isSubmitting}
+                  required
+                >
+                  <option value="">-- Select a hospital --</option>
+                  {hospitals
+                    .filter(h => h.isActive)
+                    .map((hospital) => (
+                      <option key={hospital.id} value={hospital.id}>
+                        {hospital.name} - {hospital.location}
+                      </option>
+                    ))}
+                </select>
+                {hospitals.length === 0 && (
+                  <p className="text-sm text-medical-green-600 mt-2">
+                    No hospitals available.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-6">
@@ -636,37 +1002,41 @@ const HospitalRatingDemoComponent = () => {
                 ))}
               </div>
 
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || fhevmStatus !== "ready"}
-                className="medical-btn w-full mt-8 text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Encrypting & Submitting...
-                  </span>
-                ) : (
-                  "Submit Secure Rating"
-                )}
-              </button>
+              {hasRated && selectedHospitalId ? (
+                <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg text-center">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-green-800 font-medium mb-2">
+                    ✓ You have already rated this hospital
+                  </p>
+                  <p className="text-xs text-green-600">
+                    Select another hospital to submit a new rating
+                  </p>
+                </div>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || fhevmStatus !== "ready" || !selectedHospitalId || hasRated}
+                  className="medical-btn w-full mt-8 text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Encrypting & Submitting...
+                    </span>
+                  ) : !selectedHospitalId ? (
+                    "Please Select a Hospital"
+                  ) : hasRated ? (
+                    "Already Rated This Hospital"
+                  ) : (
+                    "Submit Secure Rating"
+                  )}
+                </button>
+              )}
             </div>
-          ) : (
-            <div className="medical-card p-8 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-medical-green-800 mb-4">Thank You!</h2>
-              <p className="text-medical-green-600 mb-6">
-                Your rating has been securely submitted and encrypted. Thank you for helping improve healthcare quality.
-              </p>
-              <div className="medical-badge inline-block">
-                ✓ Rating Submitted Successfully
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -680,7 +1050,13 @@ const HospitalRatingDemoComponent = () => {
                 <p className="text-medical-green-600">Aggregated anonymous ratings from the community</p>
               </div>
               <button
-                onClick={loadStatistics}
+                onClick={() => {
+                  if (selectedHospitalForStats) {
+                    loadHospitalStatistics(selectedHospitalForStats);
+                  } else {
+                    loadStatistics();
+                  }
+                }}
                 disabled={isLoadingStats || fhevmStatus !== "ready"}
                 className="medical-btn px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -694,6 +1070,86 @@ const HospitalRatingDemoComponent = () => {
                 )}
               </button>
             </div>
+
+            {/* Hospital Selection for Statistics */}
+            <div className="mb-6">
+              <label className="block font-semibold text-medical-green-800 text-lg mb-2">
+                Select Hospital to View Statistics
+              </label>
+              <select
+                value={selectedHospitalForStats || ""}
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  setSelectedHospitalForStats(id);
+                  if (id) {
+                    loadHospitalStatistics(id);
+                  } else {
+                    loadStatistics();
+                  }
+                }}
+                className="w-full px-4 py-3 border border-medical-green-300 rounded-lg focus:ring-2 focus:ring-medical-green-500 focus:border-transparent bg-white text-medical-green-900"
+                disabled={isLoadingStats}
+              >
+                <option value="">All Hospitals (Global Statistics)</option>
+                {hospitals
+                  .filter(h => h.isActive)
+                  .map((hospital) => (
+                    <option key={hospital.id} value={hospital.id}>
+                      {hospital.name} - {hospital.location}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            {/* Deployer: Create Hospital */}
+            {isDeployer && (
+              <div className="mb-6 p-4 bg-medical-green-50 rounded-lg border border-medical-green-200">
+                <button
+                  onClick={() => setShowCreateHospital(!showCreateHospital)}
+                  className="text-medical-green-700 hover:text-medical-green-900 font-medium flex items-center gap-2"
+                  type="button"
+                >
+                  <span className="text-xl">{showCreateHospital ? "−" : "+"}</span>
+                  {showCreateHospital ? "Cancel" : "Create New Hospital"}
+                </button>
+                
+                {showCreateHospital && (
+                  <div className="mt-4 space-y-3">
+                    <input
+                      type="text"
+                      placeholder="Hospital Name"
+                      value={newHospitalName}
+                      onChange={(e) => setNewHospitalName(e.target.value)}
+                      className="w-full px-4 py-2 border border-medical-green-300 rounded-lg focus:ring-2 focus:ring-medical-green-500 focus:border-transparent"
+                      disabled={isCreatingHospital}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Location"
+                      value={newHospitalLocation}
+                      onChange={(e) => setNewHospitalLocation(e.target.value)}
+                      className="w-full px-4 py-2 border border-medical-green-300 rounded-lg focus:ring-2 focus:ring-medical-green-500 focus:border-transparent"
+                      disabled={isCreatingHospital}
+                    />
+                    <button
+                      onClick={handleCreateHospital}
+                      disabled={isCreatingHospital || !newHospitalName.trim() || !newHospitalLocation.trim()}
+                      className="medical-btn w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                      type="button"
+                    >
+                      {isCreatingHospital ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Creating...
+                        </span>
+                      ) : (
+                        "Create Hospital"
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {statistics ? (
               <div className="space-y-8">
@@ -770,31 +1226,6 @@ const HospitalRatingDemoComponent = () => {
         </div>
       )}
 
-      {/* Status Bar */}
-      <div className="mt-8 max-w-2xl mx-auto">
-        <div className="medical-card p-4">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  fhevmStatus === 'ready' ? 'bg-green-500' :
-                  fhevmStatus === 'loading' ? 'bg-yellow-500 medical-pulse' :
-                  'bg-red-500'
-                }`}></div>
-                <span className="font-medium text-medical-green-700">FHEVM: {fhevmStatus}</span>
-              </div>
-              {chainId && (
-                <span className="text-medical-green-600">Chain: {chainId}</span>
-              )}
-            </div>
-            {contractAddress && (
-              <span className="text-xs text-medical-green-500 font-mono">
-                {contractAddress.slice(0, 6)}...{contractAddress.slice(-4)}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Message Toast */}
       {message && (
@@ -813,7 +1244,7 @@ const HospitalRatingDemoComponent = () => {
             </p>
             {message.includes('Error') && (
               <button
-                onClick={() => setMessage(null)}
+                onClick={() => setMessage("")}
                 className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
               >
                 Dismiss

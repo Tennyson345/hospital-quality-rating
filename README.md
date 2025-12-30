@@ -10,9 +10,8 @@ A privacy-preserving hospital quality rating system built with FHEVM (Fully Homo
 
 Watch the demo video to see the system in action:
 
-[![Demo Video](hospital-quality-rating.mp4)](hospital-quality-rating.mp4)
+[![Demo Video](https://youtu.be/CFxEs6WdffQ)](https://youtu.be/CFxEs6WdffQ)
 
-Direct link: [hospital-quality-rating.mp4](./hospital-quality-rating.mp4)
 
 ## 🏥 Features
 
@@ -37,12 +36,12 @@ Users can rate hospitals on 6 categories (0-10 scale):
 
 ### Local Hardhat Network (Chain ID: 31337)
 ```
-0x5FbDB2315678afecb367f032d93F642f64180aa3
+0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
 ```
 
 ### Sepolia Testnet (Chain ID: 11155111)
 ```
-0x1a9A554f59ab4031d6f66D5BE5dDcf3B9baD3b0B
+0x14Af7A11Ca7b37F209dFB6F31959a1ED799AD969
 ```
 
 ## 🔐 Encryption & Decryption Logic

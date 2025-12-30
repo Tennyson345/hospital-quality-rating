@@ -53,6 +53,68 @@ export const HospitalQualityRatingABI = {
       "inputs": [
         {
           "indexed": true,
+          "internalType": "uint256",
+          "name": "hospitalId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "location",
+          "type": "string"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "timestamp",
+          "type": "uint64"
+        }
+      ],
+      "name": "HospitalCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "hospitalId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "timestamp",
+          "type": "uint64"
+        }
+      ],
+      "name": "HospitalRatingSubmitted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
           "internalType": "address",
           "name": "user",
           "type": "address"
@@ -81,10 +143,80 @@ export const HospitalQualityRatingABI = {
       "type": "event"
     },
     {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "location",
+          "type": "string"
+        }
+      ],
+      "name": "createHospital",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "hospitalId",
+          "type": "uint256"
+        }
+      ],
+      "name": "deactivateHospital",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "deployer",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "emergencyStop",
       "outputs": [],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getActiveHospitalIds",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getAllHospitalIds",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -124,6 +256,94 @@ export const HospitalQualityRatingABI = {
         {
           "internalType": "euint32",
           "name": "avgGuidance",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "hospitalId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getHospital",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "location",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "createdAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "isActive",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "hospitalId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getHospitalStatistics",
+      "outputs": [
+        {
+          "internalType": "euint32",
+          "name": "count",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "sumService",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "sumMedicine",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "sumDoctor",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "sumFacility",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "sumEnvironment",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "sumGuidance",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "euint32",
+          "name": "sumTotal",
           "type": "bytes32"
         }
       ],
@@ -315,6 +535,69 @@ export const HospitalQualityRatingABI = {
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "hospitalId",
+          "type": "uint256"
+        }
+      ],
+      "name": "hasUserRatedHospital",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "hospitals",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "hospitalId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "location",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "createdAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "isActive",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "protocolId",
       "outputs": [
@@ -328,6 +611,19 @@ export const HospitalQualityRatingABI = {
       "type": "function"
     },
     {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "hospitalId",
+          "type": "uint256"
+        }
+      ],
+      "name": "reactivateHospital",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
       "name": "resumeContract",
       "outputs": [],
@@ -336,6 +632,11 @@ export const HospitalQualityRatingABI = {
     },
     {
       "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "hospitalId",
+          "type": "uint256"
+        },
         {
           "internalType": "externalEuint32",
           "name": "encryptedIdentity",
@@ -410,6 +711,19 @@ export const HospitalQualityRatingABI = {
       "name": "submitRating",
       "outputs": [],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalHospitals",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     }
   ]

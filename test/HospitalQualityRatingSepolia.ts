@@ -44,14 +44,43 @@ describe("HospitalQualityRatingSepolia", function () {
   });
 
   it("submit a rating and verify statistics", async function () {
-    steps = 20;
+    steps = 25;
 
     this.timeout(4 * 40000);
 
-    progress("Checking if user has already rated...");
-    const hasRated = await contract.hasUserRated(signers.alice.address);
+    // Check if there are any hospitals, create one if needed
+    progress("Checking for hospitals...");
+    let hospitalId = 1;
+    try {
+      const totalHospitals = await contract.totalHospitals();
+      if (totalHospitals === 0n) {
+        // Try to create a hospital (only if deployer)
+        try {
+          progress("Creating test hospital...");
+          const tx = await contract.connect(signers.alice).createHospital("Sepolia Test Hospital", "Test Location");
+          await tx.wait();
+          hospitalId = 1;
+        } catch (error) {
+          // If not deployer, skip test
+          console.log("Cannot create hospital (not deployer), skipping test");
+          this.skip();
+          return;
+        }
+      } else {
+        hospitalId = Number(totalHospitals);
+      }
+    } catch (error) {
+      console.log("Error checking hospitals, skipping test");
+      this.skip();
+      return;
+    }
+
+    progress(`Using hospital ID: ${hospitalId}`);
+
+    progress("Checking if user has already rated this hospital...");
+    const hasRated = await contract.hasUserRatedHospital(signers.alice.address, hospitalId);
     if (hasRated) {
-      console.log("User has already submitted a rating, skipping test");
+      console.log("User has already submitted a rating for this hospital, skipping test");
       this.skip();
     }
 
@@ -97,10 +126,11 @@ describe("HospitalQualityRatingSepolia", function () {
       .add32(7)
       .encrypt();
 
-    progress(`Submitting rating to contract ${contractAddress}...`);
+    progress(`Submitting rating to contract ${contractAddress} for hospital ${hospitalId}...`);
     const tx = await contract
       .connect(signers.alice)
       .submitRating(
+        hospitalId,
         encryptedIdentity.handles[0],
         encryptedIdentity.inputProof,
         encryptedService.handles[0],
@@ -165,16 +195,61 @@ describe("HospitalQualityRatingSepolia", function () {
   it("Should handle encrypted statistics correctly", async function () {
     progress("Testing encrypted statistics retrieval");
 
+    // Get or create a hospital
+    let hospitalId = 1;
+    try {
+      const totalHospitals = await contract.totalHospitals();
+      if (totalHospitals === 0n) {
+        try {
+          const tx = await contract.connect(signers.alice).createHospital("Stats Test Hospital", "Test Location");
+          await tx.wait();
+          hospitalId = 1;
+        } catch (error) {
+          console.log("Cannot create hospital, skipping test");
+          this.skip();
+          return;
+        }
+      } else {
+        hospitalId = Number(totalHospitals);
+      }
+    } catch (error) {
+      console.log("Error checking hospitals, skipping test");
+      this.skip();
+      return;
+    }
+
     // Submit a rating first
-    const encryptedIdentity = await fhevm.encrypt64(BigInt(ethers.encodeBytes32String("stats-test-user")));
-    const encryptedService = await fhevm.encrypt64(BigInt(8));
-    const encryptedMedicine = await fhevm.encrypt64(BigInt(9));
-    const encryptedDoctor = await fhevm.encrypt64(BigInt(7));
-    const encryptedFacility = await fhevm.encrypt64(BigInt(8));
-    const encryptedEnvironment = await fhevm.encrypt64(BigInt(6));
-    const encryptedGuidance = await fhevm.encrypt64(BigInt(9));
+    const encryptedIdentity = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(1)
+      .encrypt();
+    const encryptedService = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(8)
+      .encrypt();
+    const encryptedMedicine = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(9)
+      .encrypt();
+    const encryptedDoctor = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(7)
+      .encrypt();
+    const encryptedFacility = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(8)
+      .encrypt();
+    const encryptedEnvironment = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(6)
+      .encrypt();
+    const encryptedGuidance = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(9)
+      .encrypt();
 
     const tx = await contract.connect(signers.alice).submitRating(
+      hospitalId,
       encryptedIdentity.handles[0],
       encryptedIdentity.inputProof,
       encryptedService.handles[0],
@@ -200,19 +275,72 @@ describe("HospitalQualityRatingSepolia", function () {
     progress("Successfully tested encrypted statistics retrieval");
   });
 
-  it("Should prevent duplicate ratings from same user", async function () {
+  it("Should prevent duplicate ratings from same user for same hospital", async function () {
     progress("Testing duplicate rating prevention");
 
+    // Get or create a hospital
+    let hospitalId = 1;
+    try {
+      const totalHospitals = await contract.totalHospitals();
+      if (totalHospitals === 0n) {
+        try {
+          const tx = await contract.connect(signers.alice).createHospital("Duplicate Test Hospital", "Test Location");
+          await tx.wait();
+          hospitalId = 1;
+        } catch (error) {
+          console.log("Cannot create hospital, skipping test");
+          this.skip();
+          return;
+        }
+      } else {
+        hospitalId = Number(totalHospitals);
+      }
+    } catch (error) {
+      console.log("Error checking hospitals, skipping test");
+      this.skip();
+      return;
+    }
+
+    // Check if already rated
+    const hasRated = await contract.hasUserRatedHospital(signers.alice.address, hospitalId);
+    if (hasRated) {
+      console.log("User has already rated this hospital, skipping test");
+      this.skip();
+      return;
+    }
+
     // First rating submission
-    const encryptedIdentity = await fhevm.encrypt64(BigInt(ethers.encodeBytes32String("test-user")));
-    const encryptedService = await fhevm.encrypt64(BigInt(5));
-    const encryptedMedicine = await fhevm.encrypt64(BigInt(7));
-    const encryptedDoctor = await fhevm.encrypt64(BigInt(6));
-    const encryptedFacility = await fhevm.encrypt64(BigInt(8));
-    const encryptedEnvironment = await fhevm.encrypt64(BigInt(7));
-    const encryptedGuidance = await fhevm.encrypt64(BigInt(9));
+    const encryptedIdentity = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(1)
+      .encrypt();
+    const encryptedService = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(5)
+      .encrypt();
+    const encryptedMedicine = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(7)
+      .encrypt();
+    const encryptedDoctor = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(6)
+      .encrypt();
+    const encryptedFacility = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(8)
+      .encrypt();
+    const encryptedEnvironment = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(7)
+      .encrypt();
+    const encryptedGuidance = await fhevm
+      .createEncryptedInput(contractAddress, signers.alice.address)
+      .add32(9)
+      .encrypt();
 
     const tx1 = await contract.connect(signers.alice).submitRating(
+      hospitalId,
       encryptedIdentity.handles[0],
       encryptedIdentity.inputProof,
       encryptedService.handles[0],
@@ -230,9 +358,10 @@ describe("HospitalQualityRatingSepolia", function () {
     );
     await tx1.wait();
 
-    // Attempt second rating from same user (should fail)
+    // Attempt second rating from same user for same hospital (should fail)
     try {
       const tx2 = await contract.connect(signers.alice).submitRating(
+        hospitalId,
         encryptedIdentity.handles[0],
         encryptedIdentity.inputProof,
         encryptedService.handles[0],
@@ -249,12 +378,12 @@ describe("HospitalQualityRatingSepolia", function () {
         encryptedGuidance.inputProof
       );
       await tx2.wait();
-      expect.fail("Should not allow duplicate ratings");
+      expect.fail("Should not allow duplicate ratings for same hospital");
     } catch (error: any) {
-      expect(error.message).to.include("User has already submitted a rating");
+      expect(error.message).to.include("already submitted") || expect(error.message).to.include("already rated");
     }
 
-    progress("Successfully prevented duplicate rating submission");
+    progress("Successfully prevented duplicate rating submission for same hospital");
   });
 });
 

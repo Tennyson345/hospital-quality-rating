@@ -14,11 +14,11 @@ export default async function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="text-gray-900 antialiased">
-        {/* Medical background */}
-        <div className="fixed inset-0 w-full h-full medical-bg z-[-20]"></div>
+      <body className="text-gray-900 antialiased relative">
+        {/* Medical background - fixed at bottom layer */}
+        <div className="fixed inset-0 w-full h-full medical-bg" style={{ zIndex: -1 }}></div>
 
-        <main className="flex flex-col max-w-screen-xl mx-auto pb-20 min-h-screen">
+        <main className="relative flex flex-col max-w-screen-xl mx-auto pb-20 min-h-screen" style={{ zIndex: 1 }}>
           {/* Medical header */}
           <nav className="flex w-full px-4 md:px-6 h-fit py-8 justify-between items-center">
             <div className="flex items-center gap-4">
